@@ -1,22 +1,43 @@
 [package]
 name = "pg_branch"
+version = "0.0.1"
 authors = ["Alex Pearson <alex@alexpear.com>"]
-version = "0.0.0"
 edition = "2021"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/NAlexPear/pg_branch"
+description = "Postgres extension for quickly creating copies of databases and clusters."
+keywords = ["postgres", "pgrx", "btrfs"]
+
+[badges.maintenance]
+status = "actively-developed"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [lib]
 crate-type = ["cdylib"]
 
 [features]
-default = ["pg13"]
-pg11 = ["pgrx/pg11", "pgrx-tests/pg11" ]
-pg12 = ["pgrx/pg12", "pgrx-tests/pg12" ]
-pg13 = ["pgrx/pg13", "pgrx-tests/pg13" ]
-pg14 = ["pgrx/pg14", "pgrx-tests/pg14" ]
-pg15 = ["pgrx/pg15", "pgrx-tests/pg15" ]
+default = ["pg15"]
+pg11 = ["pgrx/pg11", "pgrx-tests/pg11"]
+pg12 = ["pgrx/pg12", "pgrx-tests/pg12"]
+pg13 = ["pgrx/pg13", "pgrx-tests/pg13"]
+pg14 = ["pgrx/pg14", "pgrx-tests/pg14"]
+pg15 = ["pgrx/pg15", "pgrx-tests/pg15"]
 pg_test = []
 
+[build-dependencies]
+bindgen = "0.66.1"
+toml = "0.7.6"
+
+[build-dependencies.serde]
+features = ["derive"]
+version = "1.0.173"
+
 [dependencies]
+# btrfsutil-sys = "1.2.1"
 pgrx = "=0.9.8"
 
 [dev-dependencies]
