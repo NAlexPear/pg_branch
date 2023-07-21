@@ -22,7 +22,12 @@ fn fork(_target_port: i32) {
 }
 
 #[pg_extern]
-fn branch() {
+fn branch(target: &str, template: Option<&str>) {
+    notice!(
+        "target: {}, template: {}",
+        target,
+        template.unwrap_or("template0")
+    );
     // TODO: determine the database directory from configuration (or hard-code for now)
     // TODO: get the OID of the template database from pg_database
     // TODO: verify that the data directory of the template exist and is a BTRFS subvolume

@@ -1,8 +1,6 @@
-#![allow(unused)] // FIXME: remove this
+use pgrx::{is_a, prelude::*};
 
 /// All hooks needed to intercept and process CREATE DATABASE queries.
-use pgrx::prelude::*;
-
 struct Hooks;
 impl pgrx::PgHooks for Hooks {
     /// hook into the ProcessUtility hook to intercept CREATE DATABASE calls
@@ -27,10 +25,31 @@ impl pgrx::PgHooks for Hooks {
             completion_tag: *mut pg_sys::QueryCompletion,
         ) -> pgrx::HookResult<()>,
     ) -> pgrx::HookResult<()> {
-        // TODO: only block CREATE DATABASE, forwarding all others
-        // TODO: extract target and template databases from the query itself
-        // TODO: pass the values to branch()
-        pgrx::HookResult::new(())
+        // only block CREATE DATABASE, forwarding all others
+        if unsafe { is_a(pstmt.utilityStmt, pg_sys::NodeTag_T_CreatedbStmt) } {
+            // extract target and template databases from the statement
+            let createdb =
+                unsafe { PgBox::from_pg(pstmt.utilityStmt as *mut pg_sys::CreatedbStmt) };
+            let target = match unsafe { core::ffi::CStr::from_ptr(createdb.dbname) }.to_str() {
+                Ok(dbname) => dbname,
+                Err(error) => error!("Invalid target database: {}", error),
+            };
+
+            // FIXME: traverse the List of options to determine the template
+            // create the new branch using the top-level helper function
+            pgrx::HookResult::new(crate::branch(target, None))
+        } else {
+            prev_hook(
+                pstmt,
+                query_string,
+                read_only_tree,
+                context,
+                params,
+                query_env,
+                dest,
+                completion_tag,
+            )
+        }
     }
 }
 
