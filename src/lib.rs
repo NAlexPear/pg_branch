@@ -12,7 +12,6 @@ pgrx::pg_module_magic!();
 
 #[pg_extern]
 fn fork(_target_port: i32) {
-    // TODO: reimplement https://www.cybertec-postgresql.com/en/forking-databases-the-art-of-copying-without-copying/
     // TODO: btrfsutils create subvolume snapshot
     // TODO: recursively create subvolume snapshot of segment data subvolumes in the new fork
     // TODO: remove fork's postmaster.pid
@@ -28,7 +27,6 @@ fn branch(target: &str, template: Option<&str>) {
         target,
         template.unwrap_or("template0")
     );
-    // TODO: determine the database directory from configuration (or hard-code for now)
     // TODO: get the OID of the template database from pg_database
     // TODO: verify that the data directory of the template exist and is a BTRFS subvolume
     // TODO: generate a new OID for the new database (via INSERT of the pg_database table?)

@@ -1,4 +1,4 @@
-use pgrx::{is_a, prelude::*};
+use pgrx::{is_a, pg_sys::PgNode, prelude::*};
 
 /// All hooks needed to intercept and process CREATE DATABASE queries.
 struct Hooks;
@@ -27,17 +27,34 @@ impl pgrx::PgHooks for Hooks {
     ) -> pgrx::HookResult<()> {
         // only block CREATE DATABASE, forwarding all others
         if unsafe { is_a(pstmt.utilityStmt, pg_sys::NodeTag_T_CreatedbStmt) } {
-            // extract target and template databases from the statement
             let createdb =
                 unsafe { PgBox::from_pg(pstmt.utilityStmt as *mut pg_sys::CreatedbStmt) };
-            let target = match unsafe { core::ffi::CStr::from_ptr(createdb.dbname) }.to_str() {
-                Ok(dbname) => dbname,
-                Err(error) => error!("Invalid target database: {}", error),
+
+            // extract the target from the statement's dbname
+            let target = unsafe { core::ffi::CStr::from_ptr(createdb.dbname) }
+                .to_str()
+                .expect("Invalid dbname in CREATE DATABASE");
+
+            // extract the template name from the List of options
+            let mut template = None;
+            if !createdb.options.is_null() {
+                let options = unsafe { PgBox::from_pg(createdb.options as *mut pg_sys::List) };
+                for index in 0..options.length {
+                    let list_cell = unsafe { pg_sys::pgrx_list_nth(options.as_ptr(), index) };
+                    let element = unsafe { PgBox::from_pg(list_cell as *mut pg_sys::DefElem) };
+                    let defname = unsafe { core::ffi::CStr::from_ptr(element.defname) }
+                        .to_str()
+                        .expect("Invalid template name in CREATE DATABASE");
+
+                    if defname == "template" {
+                        let arg = unsafe { PgBox::from_pg(element.arg as *mut pg_sys::Node) };
+                        template = Some(arg.display_node().replace("\"", ""));
+                    }
+                }
             };
 
-            // FIXME: traverse the List of options to determine the template
             // create the new branch using the top-level helper function
-            pgrx::HookResult::new(crate::branch(target, None))
+            pgrx::HookResult::new(crate::branch(target, template.as_deref()))
         } else {
             prev_hook(
                 pstmt,
