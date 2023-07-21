@@ -26,6 +26,7 @@ impl pgrx::PgHooks for Hooks {
         ) -> pgrx::HookResult<()>,
     ) -> pgrx::HookResult<()> {
         // only block CREATE DATABASE, forwarding all others
+        // FIXME: check CREATEDB privilege of the user
         if unsafe { is_a(pstmt.utilityStmt, pg_sys::NodeTag_T_CreatedbStmt) } {
             let createdb =
                 unsafe { PgBox::from_pg(pstmt.utilityStmt as *mut pg_sys::CreatedbStmt) };
@@ -36,6 +37,7 @@ impl pgrx::PgHooks for Hooks {
                 .expect("Invalid dbname in CREATE DATABASE");
 
             // extract the template name from the List of options
+            // FIXME: check ownership of the template database
             let mut template = None;
             if !createdb.options.is_null() {
                 let options = unsafe { PgBox::from_pg(createdb.options as *mut pg_sys::List) };
@@ -49,6 +51,7 @@ impl pgrx::PgHooks for Hooks {
                     if defname == "template" {
                         let arg = unsafe { PgBox::from_pg(element.arg as *mut pg_sys::Node) };
                         template = Some(arg.display_node().replace("\"", ""));
+                        break;
                     }
                 }
             };
