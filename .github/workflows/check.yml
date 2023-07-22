@@ -1,0 +1,103 @@
+name: Pre-release Checks
+on:
+  push:
+  pull_request:
+    branches:
+      - main
+  workflow_call:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Run cargo fmt
+        run: cargo fmt --all -- --check
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+      - name: ⚡ Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ~/.pgrx/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-pgrx
+        run: cargo install cargo-pgrx
+      - name: Initialize pgrx
+        run: |
+          [ ! -f ~/.pgrx/config.toml ] && cargo pgrx init
+      - name: Run cargo check
+        run: cargo check
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+      - name: ⚡ Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            ~/.pgrx/
+            target/
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-pgrx
+        run: cargo install cargo-pgrx
+      - name: Initialize pgrx
+        run: |
+          [ ! -f ~/.pgrx/config.toml ] && cargo pgrx init
+      - name: Run cargo test
+        run: cargo test
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+      - name: ⚡ Cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - name: Install cargo-pgrx
+        run: cargo install cargo-pgrx
+      - name: Initialize pgrx
+        run: |
+          [ ! -f ~/.pgrx/config.toml ] && cargo pgrx init
+      - name: Run cargo clippy
+        run: cargo clippy -- -D warnings

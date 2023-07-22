@@ -144,6 +144,7 @@ fn branch(target: &str, template: Option<&str>) {
 }
 
 #[pg_guard]
+#[allow(clippy::missing_safety_doc)]
 pub unsafe extern "C" fn _PG_init() {
     hooks::init()
 }

@@ -48,7 +48,7 @@ impl pgrx::PgHooks for Hooks {
                         .expect("Invalid template name in CREATE DATABASE");
                     let arg = unsafe { PgBox::from_pg(element.arg as *mut pg_sys::Node) }
                         .to_string()
-                        .replace("\"", "");
+                        .replace('\"', "");
 
                     match defname {
                         "template" => {
@@ -75,7 +75,8 @@ impl pgrx::PgHooks for Hooks {
             };
 
             // create the new branch using the top-level helper function
-            pgrx::HookResult::new(crate::branch(target, template.as_deref()))
+            crate::branch(target, template.as_deref());
+            pgrx::HookResult::new(())
         } else {
             prev_hook(
                 pstmt,
