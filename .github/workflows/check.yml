@@ -36,25 +36,36 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            ~/.pgrx/
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-pgrx
-        run: cargo install cargo-pgrx
+        run: |
+          cargo pgrx --help 2>/dev/null 1>&2 || cargo install cargo-pgrx
+      - name: ⚡ Cache pgrx
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pgrx/
+          key: ${{ runner.os }}-pgrx
       - name: Initialize pgrx
         run: |
-          [ ! -f ~/.pgrx/config.toml ] && cargo pgrx init
+          if [ ! -f ~/.pgrx/config.toml ]; then
+            cargo pgrx init
+          fi
       - name: Run cargo check
         run: cargo check
   test:
     name: Test
     runs-on: ubuntu-latest
     steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y libbtrfsutil-dev
       - name: Checkout sources
         uses: actions/checkout@v3
-      - name: ⚡ Cache
+      - name: ⚡ Cache Cargo
         uses: actions/cache@v3
         with:
           path: |
@@ -62,16 +73,24 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            ~/.pgrx/
             target/
           key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-pgrx
-        run: cargo install cargo-pgrx
+        run: |
+          cargo pgrx --help 2>/dev/null 1>&2 || cargo install cargo-pgrx
+      - name: ⚡ Cache pgrx
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pgrx/
+          key: ${{ runner.os }}-pgrx
       - name: Initialize pgrx
         run: |
-          [ ! -f ~/.pgrx/config.toml ] && cargo pgrx init
+          if [ ! -f ~/.pgrx/config.toml ]; then
+            cargo pgrx init
+          fi
       - name: Run cargo test
         run: cargo test
   lint:
@@ -95,9 +114,18 @@ jobs:
         with:
           components: clippy
       - name: Install cargo-pgrx
-        run: cargo install cargo-pgrx
+        run: |
+          cargo pgrx --help 2>/dev/null 1>&2 || cargo install cargo-pgrx
+      - name: ⚡ Cache pgrx
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pgrx/
+          key: ${{ runner.os }}-pgrx
       - name: Initialize pgrx
         run: |
-          [ ! -f ~/.pgrx/config.toml ] && cargo pgrx init
+          if [ ! -f ~/.pgrx/config.toml ]; then
+            cargo pgrx init
+          fi
       - name: Run cargo clippy
         run: cargo clippy -- -D warnings
