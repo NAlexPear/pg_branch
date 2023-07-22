@@ -8,15 +8,28 @@ mod hooks;
 
 pgrx::pg_module_magic!();
 
-// PREREQ: configure mounted thumb drive as BTRFS
-// PREREQ: configure BTRFS subvolume in mounted drive as the postgres data directory
-// PREREQ: configure mounted drive as the postgres data directory
-// PREREQ: configure each segment data subdirectory as a nested subvolume
-// TODO: include a wrapper around initdb that tests and configures all of the above
-
 #[pg_extern]
 fn branch(target: &str, template: Option<&str>) {
     let template = template.unwrap_or("template1");
+
+    // check that the target database doesn't already exist
+    let no_duplicate = Spi::connect(|client| {
+        client
+            .select(
+                "select oid from pg_database where datname = $1",
+                Some(1),
+                Some(vec![(
+                    PgOid::BuiltIn(PgBuiltInOids::TEXTOID),
+                    target.into_datum(),
+                )]),
+            )
+            .map(|result| result.is_empty())
+    })
+    .expect("Error querying pg_database table");
+
+    if !no_duplicate {
+        error!(r#"database "{}" already exists"#, target);
+    }
 
     // get the data directory and OID of the template database from pg_database
     let segment_path_components: (Option<String>, Option<Oid>) = Spi::connect(|client| {

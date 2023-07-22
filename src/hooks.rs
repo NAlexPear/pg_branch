@@ -1,4 +1,4 @@
-use pgrx::{is_a, pg_sys::PgNode, prelude::*};
+use pgrx::{is_a, prelude::*};
 
 /// All hooks needed to intercept and process CREATE DATABASE queries.
 struct Hooks;
@@ -36,8 +36,7 @@ impl pgrx::PgHooks for Hooks {
                 .to_str()
                 .expect("Invalid dbname in CREATE DATABASE");
 
-            // extract the template name from the List of options
-            // FIXME: check ownership of the template database
+            // parse and handle relevant options
             let mut template = None;
             if !createdb.options.is_null() {
                 let options = unsafe { PgBox::from_pg(createdb.options as *mut pg_sys::List) };
@@ -47,11 +46,30 @@ impl pgrx::PgHooks for Hooks {
                     let defname = unsafe { core::ffi::CStr::from_ptr(element.defname) }
                         .to_str()
                         .expect("Invalid template name in CREATE DATABASE");
+                    let arg = unsafe { PgBox::from_pg(element.arg as *mut pg_sys::Node) }
+                        .to_string()
+                        .replace("\"", "");
 
-                    if defname == "template" {
-                        let arg = unsafe { PgBox::from_pg(element.arg as *mut pg_sys::Node) };
-                        template = Some(arg.display_node().replace("\"", ""));
-                        break;
+                    match defname {
+                        "template" => {
+                            template = Some(arg);
+                        }
+                        "strategy" if arg.to_lowercase() != "snapshot" => {
+                            // if a strategy is explicitly defined as something other than
+                            // "snapshot", forward the call to prev_hook instead
+                            return prev_hook(
+                                pstmt,
+                                query_string,
+                                read_only_tree,
+                                context,
+                                params,
+                                query_env,
+                                dest,
+                                completion_tag,
+                            );
+                        }
+                        // FIXME: support more of the CREATE DATABASE options
+                        _ => (),
                     }
                 }
             };
