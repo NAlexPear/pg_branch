@@ -54,7 +54,7 @@ impl pgrx::PgHooks for Hooks {
                         "template" => {
                             template = Some(arg);
                         }
-                        "strategy" if arg.to_lowercase() != "snapshot" => {
+                        "strategy" if !arg.is_empty() && arg.to_lowercase() != "snapshot" => {
                             // if a strategy is explicitly defined as something other than
                             // "snapshot", forward the call to prev_hook instead
                             return prev_hook(

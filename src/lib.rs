@@ -1,10 +1,14 @@
 #![cfg_attr(not(test), deny(unused_crate_dependencies))]
 
-use pgrx::{pg_sys::Oid, prelude::*, PgRelation};
+use pgrx::{prelude::*, PgRelation};
 use std::{ffi::c_char, os::unix::ffi::OsStrExt, path::Path};
+use tables::{pg_database::PgDatabaseEntry, Record};
+use template::{Template, TemplateTuple};
 
 mod btrfs;
 mod hooks;
+mod tables;
+mod template;
 
 pgrx::pg_module_magic!();
 
@@ -28,12 +32,12 @@ fn branch(target: &str, template: Option<&str>) {
     .expect("Error querying pg_database table");
 
     if !no_duplicate {
-        error!(r#"database "{}" already exists"#, target);
+        error!(r#"database "{target}" already exists"#);
     }
 
-    // get the data directory and OID of the template database from pg_database
-    let segment_path_components: (Option<String>, Option<Oid>) = Spi::connect(|client| {
-        let data_directory = client
+    // get the data directory and relevant template database fields from pg_database
+    let (data_directory, template_tuple) = Spi::connect(|client| {
+        let data_directory: Option<String> = client
             .select(
                 "select setting from pg_settings where name = 'data_directory'",
                 Some(1),
@@ -42,9 +46,9 @@ fn branch(target: &str, template: Option<&str>) {
             .first()
             .get_one()?;
 
-        let template_oid = client
+        let template_tuple: TemplateTuple = client
             .select(
-                "select oid from pg_database where datname = $1",
+                "select oid, datdba, dattablespace from pg_database where datname = $1",
                 Some(1),
                 Some(vec![(
                     PgOid::BuiltIn(PgBuiltInOids::TEXTOID),
@@ -52,23 +56,25 @@ fn branch(target: &str, template: Option<&str>) {
                 )]),
             )?
             .first()
-            .get_one()?;
+            .get_three()?;
 
-        Ok::<_, spi::Error>((data_directory, template_oid))
+        Ok::<_, spi::Error>((data_directory, template_tuple))
     })
     .expect("Error querying pg_database table");
 
+    // validate the template fields
+    let template_fields = Template::try_from(template_tuple).unwrap_or_else(|_| {
+        panic!(r#"template "{template}" does not exist in the pg_database table"#)
+    });
+
     // generate the path to the segment data of the template database
-    let template_data_path = match segment_path_components {
-        (None, _) => FATAL!("no data_directory found"),
-        (_, None) => error!(
-            "template {} does not exist in the pg_database table",
-            template
-        ),
-        (Some(data_directory), Some(template_oid)) => Path::new(&data_directory)
-            .join("base")
-            .join(template_oid.as_u32().to_string()),
-    };
+    let template_data_path = data_directory
+        .map(|data_directory| {
+            Path::new(&data_directory)
+                .join("base")
+                .join(template_fields.as_path_component())
+        })
+        .expect("No data_directory found!");
 
     // generate a new OID for the new database (via cluster oid generator)
     let target_oid = unsafe { pg_sys::GetNewObjectId() };
@@ -96,11 +102,10 @@ fn branch(target: &str, template: Option<&str>) {
     };
 
     if exit_code > 0 {
-        panic!("Failed to create a snapshot of database {}", template);
+        panic!("Failed to create a snapshot of database {template}");
     }
 
     // update the pg_database catalog table with the new database information
-    // FIXME: pull most of these fields from the template instead of hard-coding them
     let mut target_name_data = [0 as c_char; 64];
     for (left, right) in target_name_data.iter_mut().zip(
         std::ffi::CString::new(target)
@@ -112,26 +117,13 @@ fn branch(target: &str, template: Option<&str>) {
     let mut target_name = pg_sys::nameData {
         data: target_name_data,
     };
-    let pg_database_record = vec![
-        target_oid.into_datum(),
-        Some(pg_sys::Datum::from(
-            &mut target_name as *mut pg_sys::nameData as pg_sys::Name,
-        )),
-        10.into_datum(),
-        6.into_datum(),
-        'c'.into_datum(),
-        false.into_datum(),
-        true.into_datum(),
-        (-1).into_datum(),
-        716.into_datum(),
-        1.into_datum(),
-        1663.into_datum(),
-        "C.UTF-8".into_datum(),
-        "C.UTF-8".into_datum(),
-        None,
-        None,
-        None,
-    ];
+    let pg_database_record: Record = PgDatabaseEntry::new(
+        target_oid,
+        &mut target_name as *mut pg_sys::nameData as pg_sys::Name,
+        template_fields.dba,
+        template_fields.tablespace,
+    )
+    .into();
     let pg_database = PgRelation::open_with_name_and_share_lock("pg_database")
         .expect("Relation pg_database not found");
     let pg_database_tuple_descriptor = pg_database.tuple_desc();
