@@ -37,7 +37,6 @@ features = ["derive"]
 version = "1.0.173"
 
 [dependencies]
-# btrfsutil-sys = "1.2.1"
 pgrx = "=0.9.8"
 
 [dev-dependencies]
