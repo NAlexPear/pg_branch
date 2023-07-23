@@ -1,11 +1,12 @@
 #![cfg_attr(not(test), deny(unused_crate_dependencies))]
 
+use fs::{Branching, Btrfs};
 use pgrx::{prelude::*, PgRelation};
-use std::{ffi::c_char, os::unix::ffi::OsStrExt, path::Path};
+use std::{ffi::c_char, path::Path};
 use tables::{pg_database::PgDatabaseEntry, Record};
 use template::{Template, TemplateTuple};
 
-mod btrfs;
+mod fs;
 mod hooks;
 mod tables;
 mod template;
@@ -85,25 +86,7 @@ fn branch(target: &str, template: Option<&str>) {
         .join(target_oid.as_u32().to_string());
 
     // create a snapshot of the template database using the new OID
-    let exit_code = unsafe {
-        let template_path = std::ffi::CString::new(template_data_path.as_os_str().as_bytes())
-            .expect("Invalid template data path");
-
-        let target_path = std::ffi::CString::new(target_data_path.as_os_str().as_bytes())
-            .expect("Invalid target data path");
-
-        btrfs::btrfs_util_create_snapshot(
-            template_path.as_ptr(),
-            target_path.as_ptr(),
-            0,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
-        )
-    };
-
-    if exit_code > 0 {
-        panic!("Failed to create a snapshot of database {template}");
-    }
+    Btrfs::create_snapshot(template_data_path, target_data_path);
 
     // update the pg_database catalog table with the new database information
     let mut target_name_data = [0 as c_char; 64];
