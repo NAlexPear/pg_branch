@@ -7,11 +7,6 @@ use super::Branching;
 use std::path::PathBuf;
 use std::{ffi::c_char, os::unix::ffi::OsStrExt, path::Path};
 
-/// Inner bindings to btrfsutils-sys handlers
-mod inner {
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-}
-
 /// Wrapper type used for implementing the Branching trait for the btrfs file system
 pub struct Btrfs;
 
@@ -24,7 +19,7 @@ impl Branching for Btrfs {
             let destination_path = std::ffi::CString::new(destination.as_os_str().as_bytes())
                 .expect("Invalid destination path");
 
-            inner::btrfs_util_create_snapshot(
+            btrfsutil_sys::btrfs_util_create_snapshot(
                 source_path.as_ptr(),
                 destination_path.as_ptr(),
                 0,
