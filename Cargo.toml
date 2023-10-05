@@ -38,10 +38,10 @@ version = "1.0.173"
 
 [dependencies]
 btrfsutil-sys = "1.3.0"
-pgrx = "=0.9.8"
+pgrx = "=0.10.2"
 
 [dev-dependencies]
-pgrx-tests = "=0.9.8"
+pgrx-tests = "=0.10.2"
 
 [profile.dev]
 panic = "unwind"
