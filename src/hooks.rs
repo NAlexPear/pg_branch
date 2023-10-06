@@ -39,14 +39,14 @@ impl pgrx::PgHooks for Hooks {
             // parse and handle relevant options
             let mut template = None;
             if !createdb.options.is_null() {
-                let options = unsafe { PgBox::from_pg(createdb.options as *mut pg_sys::List) };
+                let options = unsafe { PgBox::from_pg(createdb.options) };
                 for index in 0..options.length {
                     let list_cell = unsafe { pg_sys::pgrx_list_nth(options.as_ptr(), index) };
                     let element = unsafe { PgBox::from_pg(list_cell as *mut pg_sys::DefElem) };
                     let defname = unsafe { core::ffi::CStr::from_ptr(element.defname) }
                         .to_str()
                         .expect("Invalid template name in CREATE DATABASE");
-                    let arg = unsafe { PgBox::from_pg(element.arg as *mut pg_sys::Node) }
+                    let arg = unsafe { PgBox::from_pg(element.arg) }
                         .to_string()
                         .replace('\"', "");
 
